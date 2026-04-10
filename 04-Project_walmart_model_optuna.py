@@ -350,7 +350,7 @@ def objective(trial):
     with mlflow.start_run(nested=True):
         params = {
             "alpha": trial.suggest_float("alpha", 1e-8, 5, log=True),
-            "model_type": trial.suggest_categorical("model_type", ["Ridge"])# ["Linear", "Ridge", "Lasso"])
+            "model_type": trial.suggest_categorical("model_type", ["Lasso"])# ["Linear", "Ridge", "Lasso"])
             }
         
         pipeline = create_model(params)
