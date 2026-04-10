@@ -9,7 +9,7 @@ import mlflow
 from mlflow.models.signature import infer_signature
 from mlflow import MlflowClient
 
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LinearRegression, Ridge, Lasso
 from sklearn.model_selection import train_test_split
@@ -50,7 +50,7 @@ mlflow.set_experiment(os.environ["EXPERIMENT_NAME"])
 # --- DATA LOADING AND CLEANING ---
 
 ## Data loading
-data = pd.read_csv('Walmart_Store_sales.csv')
+data = pd.read_csv('data/Walmart_Store_sales.csv')
 
 ## Data cleaning
 ### Drop missing values
@@ -75,6 +75,8 @@ for col in col_list:
     var = data[col].std()
     data = data[data[col].between(avg-3*var, avg+3*var)]
 
+data["Store"] = data["Store"].astype(int).astype(str)
+
 data.describe()
 
 #------------------------------------------------------
@@ -86,8 +88,12 @@ print("Training in progress....")
 X = data.drop(target, axis = 1)
 y = data[target]
 
+num_col = X.columns.drop("Store")
+cat_col = ["Store"]
+
 x_train, x_test, y_train, y_test = train_test_split(
-    X, y, test_size=test_size, random_state=42
+    X, y, test_size=test_size, #random_state=42,
+    stratify=["Store"]
 )
 
 input_example = x_train.iloc[:3]
@@ -96,7 +102,8 @@ input_example = x_train.iloc[:3]
 # pas de ColumnTransformer car seulement des colonnes numériques
 pipeline = Pipeline(
     steps=[
-        ("scaler", StandardScaler()),
+        ("scaler", StandardScaler(), num_col),
+        ("ohe", OneHotEncoder(handle_unknown="ignore", sparse_output=False), cat_col)
         ("model", Lasso())
     ]
 )

@@ -11,8 +11,9 @@ import mlflow
 from mlflow.models.signature import infer_signature
 from mlflow import MlflowClient
 
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LinearRegression, Ridge, Lasso
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, root_mean_squared_error
@@ -52,10 +53,10 @@ mlflow.set_experiment(os.environ["EXPERIMENT_NAME"])
 # --- DATA LOADING AND CLEANING ---
 
 ## Data loading
-data = pd.read_csv('Walmart_Store_sales.csv')
+data = pd.read_csv('data/Walmart_Store_sales.csv')
 
 ## Data cleaning
-### Drop missing values
+### Drop or replace the missing values
 data = data[data["Weekly_Sales"].notna()]
 data["Holiday_Flag"] = data["Holiday_Flag"].fillna(0)
 data["Temperature"] = data["Temperature"].fillna(data["Temperature"].mean())
@@ -77,13 +78,18 @@ for col in col_list:
     var = data[col].std()
     data = data[data[col].between(avg-3*var, avg+3*var)]
 
+data["Store"] = data["Store"].astype(int).astype(str)
+
 data.describe()
 
 X = data.drop(target, axis = 1)
 y = data[target]
 
+num_col = X.columns.drop("Store")
+cat_col = ["Store"]
+
 x_train, x_test, y_train, y_test = train_test_split(
-    X, y, test_size=test_size, random_state=42
+    X, y, test_size=test_size, random_state=42,
 )
 
 input_example = x_train.iloc[:3]
@@ -103,10 +109,13 @@ def create_model(params):
         "Ridge": Ridge(alpha=params["alpha"]),
         "Lasso": Lasso(alpha=params["alpha"])
     }
-
+    coltran = ColumnTransformer([
+        ("scaler", StandardScaler(), num_col),
+        ("ohe", OneHotEncoder(handle_unknown="ignore", sparse_output=False), cat_col)
+    ])
     pipeline = Pipeline(
         steps=[
-            ("scaler", StandardScaler()),
+            ("coltran", coltran),
             ("model", models_dic[params["model_type"]])
         ]
     )
@@ -341,7 +350,7 @@ def objective(trial):
     with mlflow.start_run(nested=True):
         params = {
             "alpha": trial.suggest_float("alpha", 1e-8, 5, log=True),
-            "model_type": trial.suggest_categorical("model_type", ["Linear", "Ridge", "Lasso"])
+            "model_type": trial.suggest_categorical("model_type", ["Ridge"])# ["Linear", "Ridge", "Lasso"])
             }
         
         pipeline = create_model(params)
@@ -419,7 +428,7 @@ with mlflow.start_run(run_name=run_name, nested=True):
 
 
   # Log the correlation plot
-  correlation_plot = plot_correlation_with_target(data,target_name=target, save_path="correlation_plot.png")
+  correlation_plot = plot_correlation_with_target(data,target_name=target, save_path="artifact/correlation_plot.png")
   mlflow.log_figure(figure=correlation_plot, artifact_file="correlation_plot.png")
 
   # Log the feature importances plot
@@ -427,15 +436,15 @@ with mlflow.start_run(run_name=run_name, nested=True):
 #   mlflow.log_figure(figure=importances, artifact_file="feature_importances.png")
 
   # Log the residuals plot
-  residuals = plot_residuals(y_pred, y_test, save_path="residuals.png")
+  residuals = plot_residuals(y_pred, y_test, save_path="artifact/residuals.png")
   mlflow.log_figure(figure=residuals, artifact_file="residuals.png")
 
   # Log the correlation between pred and true values
-  prediction = plot_correlation(y_pred, y_test, save_path="prediction.png")
+  prediction = plot_correlation(y_pred, y_test, save_path="artifact/prediction.png")
   mlflow.log_figure(figure=prediction, artifact_file="prediction.png")
 
   #Log the evolution of the metric
-  history = plot_history(study, save_path = "history.png")
+  history = plot_history(study, save_path = "artifact/history.png")
   mlflow.log_figure(figure=history, artifact_file="history.png")
 
     # MLflow signature
