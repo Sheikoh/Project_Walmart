@@ -1,5 +1,8 @@
 # Project Walmart
 
+lien github:
+https://github.com/Sheikoh/Project_Walmart.git
+
 ## Objective
 
 The objective of this project is to predict the Weekly_Sales for the Walmart stores. 
